@@ -1,6 +1,9 @@
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::io;
+use std::thread;
+use std::sync::{Arc, Mutex};
+
 
 fn make_connection(ip: &str, port: &str) -> io::Result<TcpStream>{
 
@@ -44,6 +47,28 @@ fn main(){
     port = port.trim().to_string();
 
     if let Ok(mut stream) = make_connection(&ip, &port){
+        
+        let mut read_stream = stream.try_clone().expect("Failed to clone stream");
+
+        thread::spawn(move || {
+         loop {
+        let mut buffer = [0u8; 128];
+                match read_stream.read(&mut buffer) {
+                Ok(n) => {
+                    println!("received {} bytes", n);
+                    let received = &buffer[..n];
+                    println!("Raw bytes: {:?}", received);
+                    if let Ok(text) = std::str::from_utf8(received) {
+                        println!("As string: {}", text);
+                    }
+                }
+                Err(e) => {
+                    println!("error reading/receiving bytes")
+                }
+            }
+        }
+        });
+        
         loop {
             let mut user_command = String::new();
 
@@ -58,7 +83,6 @@ fn main(){
 
             user_command = user_command.trim().to_string();
 
-            let mut send_buff = [0u8; 128];
 
 
 
@@ -75,20 +99,6 @@ fn main(){
                 }
 
 
-                let mut buffer = [0u8; 128];
-                match stream.read(&mut buffer) {
-                Ok(n) => {
-                    println!("received {} bytes", n);
-                    let received = &buffer[..n];
-                    println!("Raw bytes: {:?}", received);
-                    if let Ok(text) = std::str::from_utf8(received) {
-                        println!("As string: {}", text);
-                    }
-                }
-                Err(e) => {
-                    println!("error reading/receiving bytes")
-                }
-            }
 
             } else if user_command.starts_with("send") {
                 print!("You must provide a message to send. Usage: send 'message'\n");
